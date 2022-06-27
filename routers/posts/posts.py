@@ -7,7 +7,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from extras.validators import is_auth, has_access
-from extras.values_helper import serializator
+from extras.values_helper import serializer
 from libraries.database.async_database import DatabaseORM
 
 router = APIRouter()
@@ -32,7 +32,7 @@ async def get_all_posts(request: Request, blog_id: int, user: Record = Depends(i
         posts_likes = await db.entry_exists(table_name="post_likes", where=where)
         posts_views = await db.entry_exists(table_name="post_views", where=where)
 
-        temp_dict = serializator([post])
+        temp_dict = serializer([post])
         temp_dict[0]["is_liked"] = posts_likes
         temp_dict[0]["is_viewed"] = posts_views
         return_dict["posts"].append(temp_dict)
@@ -111,14 +111,16 @@ async def get_one_post(request: Request, process_id: int, post_id: int, user: Re
     posts = await db.get_filtered_entries(table_name="posts", where=where_dict)
 
     returned_values["is_liked"] = posts_likes
-    returned_values["post"] = serializator(posts)
+    returned_values["post"] = serializer(posts)
 
     return JSONResponse(status_code=200, content={"response": returned_values})
 
 
 @router.post("/api/v1/{process_id}/posts/{post_id}/like")
-async def post_like(process_id: int, post_id: int, user: Record = Depends(is_auth)):
-    db = DatabaseORM()
+async def post_like(process_id: int,
+                    post_id: int,
+                    user: Record = Depends(is_auth),
+                    db=DatabaseORM()):
 
     if not await db.entry_exists(table_name="posts", where={"id": post_id, "blog_id": process_id}):
         raise HTTPException(status_code=404, detail={"error": "Post not found."})
@@ -132,9 +134,7 @@ async def post_like(process_id: int, post_id: int, user: Record = Depends(is_aut
 
 
 @router.get("/api/v1/posts/last/", dependencies=[Depends(is_auth)])
-async def post_last():
-    db = DatabaseORM()
+async def post_last(db=DatabaseORM()):
     posts = await db.get_filtered_entries(table_name="posts", order_by="created_at desc")
 
-    returned_dict = serializator(posts, limit=5)
-    return JSONResponse(status_code=200, content={"response": returned_dict})
+    return JSONResponse(status_code=200, content={"response": serializer(posts, limit=5)})
